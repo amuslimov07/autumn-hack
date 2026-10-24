@@ -7,13 +7,44 @@ def test_rules_categorize_rent_and_uncertain_operation():
     rent = categorize_rule({"amount": -1000, "purpose": "Арендная плата", "counterparty": "БЦ"})
     unknown = categorize_rule({"amount": -1000, "purpose": "прочее", "counterparty": ""})
     assert rent["category"] == "Аренда"
-    assert unknown["category"] == "Требует проверки"
-    assert unknown["needs_review"]
+    assert unknown["category"] == "Прочие расходы"
+    assert not unknown["needs_review"]
 
 
 def test_client_revenue_rule():
     result = categorize_rule({"amount": 500, "purpose": "Оплата от клиента за услуги"})
     assert result["category"] == "Выручка и поступления от клиентов"
+
+
+def test_category_uses_operation_direction_and_russian_payment_variants():
+    incoming = categorize_rule({
+        "direction": "поступление", "amount": 1250, "purpose": "Оплата по договору",
+        "counterparty": "Заказчик",
+    })
+    customer_inflow = categorize_rule({
+        "direction": "поступление", "amount": 1250, "purpose": "",
+        "counterparty": "Покупатель",
+    })
+    outgoing = categorize_rule({
+        "direction": "списание", "amount": 1250, "purpose": "Оплата по договору",
+        "counterparty": "Получатель",
+    })
+    salary = categorize_rule({"direction": "списание", "purpose": "Перечисление зарплаты сотрудникам"})
+    salary_variant = categorize_rule({"direction": "списание", "purpose": "Выплата ЗП"})
+    rent = categorize_rule({"direction": "списание", "purpose": "Арендная плата за помещение"})
+    assert incoming["category"] == "Выручка и поступления от клиентов"
+    assert customer_inflow["category"] == "Выручка и поступления от клиентов"
+    assert outgoing["category"] == "Прочие расходы"
+    assert salary["category"] == salary_variant["category"] == "Фонд оплаты труда"
+    assert rent["category"] == "Аренда"
+
+
+def test_unknown_operation_gets_fallback_category_for_its_direction():
+    incoming = categorize_rule({"direction": "поступление", "purpose": "Неизвестная транзакция"})
+    outgoing = categorize_rule({"direction": "списание", "purpose": "Неизвестная транзакция"})
+    assert incoming["category"] == "Прочие поступления"
+    assert outgoing["category"] == "Прочие расходы"
+    assert not incoming["needs_review"] and not outgoing["needs_review"]
 
 
 def test_user_labeled_examples_enable_classifier_without_fabricated_labels():

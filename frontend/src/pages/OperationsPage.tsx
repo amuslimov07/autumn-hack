@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { Search, SlidersHorizontal } from 'lucide-react'
 import { api } from '../api/client'
 import { QueryState, EmptyState } from '../components/State'
@@ -11,7 +11,6 @@ const CATEGORIES = ['Выручка и поступления от клиент�
 
 export function OperationsPage() {
   const { company } = useCompanyContext()
-  const queryClient = useQueryClient()
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const [direction, setDirection] = useState('')
@@ -29,14 +28,10 @@ export function OperationsPage() {
   if (endDate) params.set('end_date', endDate)
   const queryKey = params.toString()
   const result = useQuery({ queryKey: keys.operations(company?.company_id ?? '', queryKey), queryFn: () => api.operations(company!.company_id, params) })
-  const categoryChange = useMutation({
-    mutationFn: ({ operationId, value }: { operationId: string; value: string }) => api.changeCategory(company!.company_id, operationId, value),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['operations', company?.company_id] }),
-  })
   const pageCount = Math.ceil((result.data?.total ?? 0) / 30)
   const setFilter = (action: () => void) => { action(); setPage(1) }
   return <div className="page-stack">
-    <div className="page-heading"><div><div className="eyebrow">ИСТОРИЯ КОМПАНИИ</div><h1>Операции</h1><p>Постраничная загрузка с сервера. Корректировки категорий сохраняются в SQLite.</p></div><span className="tag">{result.data?.total.toLocaleString('ru-RU') ?? '…'} операций</span></div>
+    <div className="page-heading"><div><div className="eyebrow">ИСТОРИЯ КОМПАНИИ</div><h1>Операции</h1><p>Категории определяются автоматически по назначению и данным контрагента.</p></div><span className="tag">{result.data?.total.toLocaleString('ru-RU') ?? '…'} операций</span></div>
     <section className="card">
       <div className="operation-filters">
         <label className="search-box"><Search size={17} /><input placeholder="Поиск: контрагент или назначение" value={search} onChange={(event) => setFilter(() => setSearch(event.target.value))} /></label>
@@ -50,11 +45,10 @@ export function OperationsPage() {
       <QueryState isLoading={result.isLoading} error={result.error as Error | null}>
         {result.data?.items.length ? <div className="table-scroll"><table><thead><tr><th>Дата</th><th>Контрагент / назначение</th><th>Направление</th><th>Сумма</th><th>Остаток дня</th><th>Категория</th></tr></thead><tbody>{result.data.items.map((operation) => <tr key={operation.operation_id}>
           <td className="nowrap">{dateRu(operation.operation_date)}</td><td><strong>{operation.counterparty_name || 'Не указан'}</strong><small className="table-subtitle">{operation.payment_purpose || '—'}</small><small className="table-subtitle">ИНН: {operation.counterparty_inn || '—'}</small></td>
-          <td><span className={`direction-tag ${operation.direction === 'поступление' ? 'income' : 'expense'}`}>{operation.direction}</span></td><td className={operation.signed_amount > 0 ? 'positive nowrap' : 'negative nowrap'}>{currency(operation.signed_amount)}</td><td className="nowrap">{currency(operation.balance_eod)}</td><td><select className="category-select" aria-label={`Категория ${operation.operation_id}`} value={operation.category} onChange={(event) => categoryChange.mutate({ operationId: operation.operation_id, value: event.target.value })}>{CATEGORIES.map((item) => <option key={item}>{item}</option>)}</select>{operation.needs_review && <small className="review-note">Проверьте вручную</small>}</td>
+          <td><span className={`direction-tag ${operation.direction === 'поступление' ? 'income' : 'expense'}`}>{operation.direction}</span></td><td className={operation.signed_amount > 0 ? 'positive nowrap' : 'negative nowrap'}>{currency(operation.signed_amount)}</td><td className="nowrap">{currency(operation.balance_eod)}</td><td><span className="tag">{operation.category}</span></td>
         </tr>)}</tbody></table></div> : <EmptyState>По этим фильтрам операций нет.</EmptyState>}
       </QueryState>
       <div className="pagination"><span>Страница {page} из {Math.max(pageCount, 1)} · всего {result.data?.total ?? 0}</span><div><button className="button secondary" disabled={page <= 1} onClick={() => setPage(page - 1)}>Назад</button><button className="button secondary" disabled={page >= pageCount} onClick={() => setPage(page + 1)}>Далее</button></div></div>
-      {categoryChange.isError && <p className="inline-error">{categoryChange.error.message}</p>}
     </section>
   </div>
 }

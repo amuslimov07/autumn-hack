@@ -36,7 +36,7 @@ def categorize_operations(frame, training_examples=None):
             operations.loc[index, ["method", "confidence", "needs_review"]] = ["ручная/импортированная разметка", 1.0, False]
             continue
         result = categorize_rule(operation)
-        if result["needs_review"] and classifier is not None:
+        if float(result["confidence"]) < 0.65 and classifier is not None:
             text = " ".join(str(operation.get(key, "")) for key in ("purpose", "counterparty", "inn"))
             prediction = classifier.predict(text, minimum_confidence=0.6)
             if not prediction["needs_review"]:

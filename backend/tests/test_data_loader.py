@@ -1,5 +1,7 @@
 import pandas as pd
 
+from app.core.storage import SQLiteStore
+from app.services.categorization import categorize_operations
 from app.services.data_loader import load_dataset, validate_daily_balances
 
 
@@ -43,6 +45,25 @@ def test_combined_source_takes_precedence_over_duplicate_individual_files(tmp_pa
     dataset = load_dataset(tmp_path)
     assert len(dataset.operations) == 1
     assert dataset.operations.iloc[0]["company_id"] == "C001"
+
+
+def test_loaded_source_operations_are_automatically_categorized(tmp_path):
+    (tmp_path / "companies.csv").write_text(
+        "company_id;name\nC001;Test\n", encoding="utf-8-sig",
+    )
+    (tmp_path / "all_operations.csv").write_text(
+        "company_id;operation_id;operation_date;amount;direction;counterparty_inn;counterparty_name;payment_purpose;balance_eod\n"
+        "C001;O1;2025-01-01;100;Поступление;001;Покупатель;Оплата от клиента за товар;100\n"
+        "C001;O2;2025-01-02;50;Списание;002;Неизвестный;Неизвестная операция;50\n",
+        encoding="utf-8-sig",
+    )
+    dataset = load_dataset(tmp_path)
+    categorized = categorize_operations(dataset.operations, SQLiteStore(tmp_path / "categories.sqlite"))
+
+    assert categorized["category"].notna().all()
+    assert categorized["category"].ne("").all()
+    assert categorized.set_index("operation_id").loc["O1", "category"] == "Выручка и поступления от клиентов"
+    assert categorized.set_index("operation_id").loc["O2", "category"] == "Прочие расходы"
 
 
 def test_missing_dataset_returns_a_diagnostic_instead_of_crashing(tmp_path):

@@ -10,6 +10,7 @@ import pandas as pd
 from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import JSONResponse
 
+from config.settings import DEFAULT_CATEGORIES
 from app.schemas.api import CategoryPatch, EventCreate, EventPatch, RecurringPatch
 from app.services.categorization import categorize_operations
 from app.services.data_loader import validate_daily_balances
@@ -18,13 +19,7 @@ from app.services.recurring import company_recurring
 from src.data.loader import detect_columns, parse_money
 
 router = APIRouter(prefix="/api")
-VALID_CATEGORIES = (
-    "Выручка и поступления от клиентов", "Закупки и поставщики", "Фонд оплаты труда",
-    "Налоги и обязательные платежи", "Аренда", "Маркетинг и реклама",
-    "Логистика и транспорт", "Комиссии банка", "Кредиты и проценты", "Лизинг",
-    "Оборудование и капитальные расходы", "Переводы между собственными счетами",
-    "Прочие поступления", "Прочие расходы", "Требует проверки",
-)
+VALID_CATEGORIES = DEFAULT_CATEGORIES
 
 
 def _json_value(value):
